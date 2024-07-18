@@ -45,7 +45,12 @@ y = np.array(y).astype('float32')
 
 # Split the Dataset with 20% as test data
 
-X_train , X_test, y_train, y_test = train_test_split(X, y, test_size=2)
+print("Split the Data")
+
+X_train , X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+print(f"X_train.shape: {X_train.shape} X_test.shape: {X_test.shape}")
+print(f"y_train.shape: {y_train.shape} y_test.shape: {y_test.shape}")
 
 # Train the Model
 print("Train the Model")
@@ -71,3 +76,42 @@ print(f"regression_model_sklearn_accuracy={regression_model_sklearn_accuracy}")
 
 print(f"coefficient={regression_model_sklearn.coef_}")
 print(f"intercept={regression_model_sklearn.intercept_}")
+
+
+# Train the Model
+print("Train the Model (fit_intercept=True)")
+
+regression_model_sklearn = LinearRegression(fit_intercept=True) #fit_intercept enable y intercept
+regression_model_sklearn.fit(X_train, y_train)
+
+regression_model_sklearn_accuracy = regression_model_sklearn.score(X_test, y_test)
+print(f"regression_model_sklearn_accuracy={regression_model_sklearn_accuracy}")
+
+print(f"coefficient={regression_model_sklearn.coef_}")
+print(f"intercept={regression_model_sklearn.intercept_}")
+
+y_predict = regression_model_sklearn.predict(X_test)
+print(f"y_predict={y_predict}")
+
+# Plot the training data
+y_predict = regression_model_sklearn.predict(X_train)
+plt.figure(figsize = (10, 6))
+plt.scatter(X_train, y_train, color = 'b')
+plt.plot(X_train, y_predict, color = 'red')
+plt.ylabel('Revenue [$]')
+plt.xlabel('Temperature [Celcius] (Train)')
+plt.title('Revenue vs. Temperature')
+plt.grid()
+plt.show()
+
+# Plot the test data
+y_predict = regression_model_sklearn.predict(X_test)
+print(f"y_predict {y_predict.shape} \n {y_predict}")
+plt.figure(figsize = (10, 6))
+plt.scatter(X_test, y_test, color = 'b')
+plt.plot(X_test, y_predict, color = 'red')
+plt.ylabel('Revenue [$]')
+plt.xlabel('Temperature [Celcius] (Test)')
+plt.title('Revenue vs. Temperature')
+plt.grid()
+plt.show()
