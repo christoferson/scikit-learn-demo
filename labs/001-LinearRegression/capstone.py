@@ -14,3 +14,31 @@ print(f"Head:\n {fuel_economy_df.head()}")
 print(f"Tail:\n {fuel_economy_df.tail()}")
 print(f"Describe:\n {fuel_economy_df.describe()}")
 #print(f"Revenue.min:\n {fuel_economy_df['Revenue'].min()}")
+
+# Histogram
+fig = plt.figure()
+fuel_economy_df['Horse Power'].hist(bins=42, figsize=(12, 5), color='b')
+fig.suptitle('Horse Power Histogram')
+#plt.show()
+
+# Histogram
+fig = plt.figure()
+fuel_economy_df['Fuel Economy (MPG)'].hist(bins=42, figsize=(12, 5), color='b')
+fig.suptitle('Fuel Economy (MPG) Histogram')
+#plt.show()
+
+# Pairplot
+sns.pairplot(fuel_economy_df)
+#plt.show()
+
+# Correlation Matrix
+correlation_matrix = fuel_economy_df.corr()
+sns.heatmap(correlation_matrix, annot=True)
+#plt.show()
+
+
+X = fuel_economy_df[['Horse Power']]
+y = fuel_economy_df[['Fuel Economy (MPG)']]
+
+print(f"X: {X.shape} \n{X}")
+print(f"y: {y.shape} \n{y}")
