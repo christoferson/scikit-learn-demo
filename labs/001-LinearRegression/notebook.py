@@ -115,3 +115,10 @@ plt.xlabel('Temperature [Celcius] (Test)')
 plt.title('Revenue vs. Temperature')
 plt.grid()
 plt.show()
+
+# Predict X = 35 and X =10
+X_input = np.array([[35], [10]]) #pd.DataFrame({'Temperature': [35, 10]})
+y_predict = regression_model_sklearn.predict(X_input)
+print(f"Predicted values:")
+print(f"For 35 degrees: {y_predict[0]}")
+print(f"For 10 degrees: {y_predict[1]}")
