@@ -19,3 +19,51 @@ print(f"Info:\n {used_car_price_df.info()}")
 print(f"Dtypes:\n {used_car_price_df.dtypes}")
 print(f"MSRP.min:\n {used_car_price_df['MSRP'].min()}")
 print(f"Null.Sum:\n {used_car_price_df.isnull().sum()}")
+
+
+# Histogram
+fig = plt.figure()
+used_car_price_df['MSRP'].hist(bins=42, figsize=(12, 5), color='b')
+fig.suptitle('MSRP Histogram')
+plt.show()
+
+# Heatmap - Null Values
+sns.heatmap(used_car_price_df.isnull(), yticklabels=False, cbar=False, cmap="Blues")
+plt.show()
+
+# Scatterplot
+sns.scatterplot(x='Horsepower', y='MSRP', data=used_car_price_df)
+plt.show()
+
+# List out the unique Types
+unique_types = used_car_price_df.Type.unique()
+print(f"UniqueTypes (Types): {unique_types}")
+
+# List out the unique Make
+unique_types = used_car_price_df.Make.unique()
+print(f"UniqueTypes (Makes): {unique_types}")
+
+# Pairplot
+#sns.pairplot(used_car_price_df)
+#plt.show()
+
+# Plot figure to count Types
+plt.figure(figsize=(16, 8))
+sns.countplot(x = used_car_price_df['Type'])
+locs, labels = plt.xticks()
+plt.setp(labels, rotation = 45)
+plt.show()
+
+# Plot figure to count Types
+plt.figure(figsize=(16, 8))
+sns.countplot(x = used_car_price_df['Origin'])
+locs, labels = plt.xticks()
+plt.setp(labels, rotation = 45)
+plt.show()
+
+# Plot figure to count Types
+plt.figure(figsize=(16, 8))
+sns.countplot(x = used_car_price_df['DriveTrain'])
+locs, labels = plt.xticks()
+plt.setp(labels, rotation = 45)
+plt.show()
