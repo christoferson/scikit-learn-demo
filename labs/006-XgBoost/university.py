@@ -29,6 +29,20 @@ print(f"y: {y.shape} \n{y}")
 X = np.array(X).astype('float32')
 y = np.array(y).astype('float32')
 
+# Explore Data
+
+# check if there are any Null values
+sns.heatmap(university_admission_df.isnull(), yticklabels = False, cbar = False, cmap="Blues")
+plt.show()
+
+university_admission_df.hist(bins = 30, figsize = (20,20), color = 'r');
+plt.show()
+
+for i in university_admission_df.columns:
+    
+  plt.figure(figsize = (13, 7))
+  sns.scatterplot(x = i, y = 'Chance_of_Admission', hue = "University_Rating", hue_norm = (1,5), data = university_admission_df)
+  plt.show()
 
 
 # Split the Dataset with 20% as test data
