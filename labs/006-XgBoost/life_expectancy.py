@@ -11,35 +11,71 @@ import xgboost as xgb
 
 
 #labs/001-LinearRegression
-university_admission_df = pd.read_csv("labs/006-XgBoost/data/university_admission.csv")
+life_expectancy_df = pd.read_csv("labs/006-XgBoost/data/Life_Expectancy_Data.csv")
 #print(icecream_sales_df)
-print(f"Head:\n {university_admission_df.head()}")
-print(f"Tail:\n {university_admission_df.tail()}")
-print(f"Describe:\n {university_admission_df.describe()}")
-print(f"columns:\n {university_admission_df.columns}")
-print(f"shape:\n {university_admission_df.shape}")
-print(f"isnull().sum():\n {university_admission_df.isnull().sum()}")
-university_admission_df = university_admission_df.dropna()
+print(f"Head:\n {life_expectancy_df.head()}")
+print(f"Tail:\n {life_expectancy_df.tail()}")
+print(f"Describe:\n {life_expectancy_df.describe()}")
+print(f"columns:\n {life_expectancy_df.columns}")
+print(f"shape:\n {life_expectancy_df.shape}")
+print(f"isnull().sum():\n {life_expectancy_df.isnull().sum()}")
+life_expectancy_df = life_expectancy_df.dropna()
 
 # Explore Data
 
+print(f"----------------------------- Exploratory Analysis -----------------------------------")
+
 # check if there are any Null values
-sns.heatmap(university_admission_df.isnull(), yticklabels = False, cbar = False, cmap="Blues")
+sns.heatmap(life_expectancy_df.isnull(), yticklabels = False, cbar = False, cmap="Blues")
 plt.show()
 
-university_admission_df.hist(bins = 30, figsize = (20,20), color = 'r');
+life_expectancy_df.hist(bins = 30, figsize = (15,15), color = 'r');
 plt.show()
 
-for i in university_admission_df.columns:
-    
-  plt.figure(figsize = (13, 7))
-  sns.scatterplot(x = i, y = 'Chance_of_Admission', hue = "University_Rating", hue_norm = (1,5), data = university_admission_df)
-  plt.show()
+# Note that there is space after 'Life expectancy '
+sns.scatterplot(x = 'Income composition of resources', y = 'Life expectancy ', hue = 'Status', data = life_expectancy_df);
+plt.show()
+
+# Note that there is space after 'Life expectancy '
+sns.scatterplot(x = 'Income composition of resources', y = 'Life expectancy ', data = life_expectancy_df);
+plt.show()
+
+# Note that there is space after 'Life expectancy '
+sns.scatterplot(x = 'Schooling', y = 'Life expectancy ', data = life_expectancy_df);
+plt.show()
+
+# Note that there is space after 'Life expectancy '
+sns.scatterplot(x = 'Schooling', y = 'Life expectancy ', hue = 'Status', data = life_expectancy_df);
+plt.show()
+
+
+# Plot the correlation matrix
+plt.figure(figsize = (20,20))
+life_expectancy_numeric_cols = life_expectancy_df.select_dtypes(include=['float64', 'int64']).columns
+corr_matrix = life_expectancy_df[life_expectancy_numeric_cols].corr()
+sns.heatmap(corr_matrix, annot = True)
+
+#### Clean Data
+
+print(f"----------------------------- Clean Data -----------------------------------")
+
+# Perform one-hot encoding
+life_expectancy_df = pd.get_dummies(life_expectancy_df, columns = ['Status'])
+
+# Check the number of null values for the columns having null values
+life_expectancy_df.isnull().sum()[np.where(life_expectancy_df.isnull().sum() != 0)[0]]
+
+# Since most of the are continous values we fill them with mean
+life_expectancy_df = life_expectancy_df.apply(lambda x: x.fillna(x.mean()),axis=0)
+
+life_expectancy_df.isnull().sum()[np.where(life_expectancy_df.isnull().sum() != 0)[0]]
 
 # Create the Training and Test Data
 
-X = university_admission_df.drop("Chance_of_Admission", axis = 1)
-y = university_admission_df["Chance_of_Admission"]
+print(f"----------------------------- Create Train and Test Data -----------------------------------")
+
+X = life_expectancy_df.drop("Life expectancy ", axis = 1)
+y = life_expectancy_df["Life expectancy "]
 
 print(f"X: {X.shape} \n{X}")
 print(f"y: {y.shape} \n{y}")
@@ -64,9 +100,9 @@ print(f"X_train.shape: {X_train.shape} X_test.shape: {X_test.shape}")
 print(f"y_train.shape: {y_train.shape} y_test.shape: {y_test.shape}")
 
 
-# Train the Model (Linear Regression)
+# Train the Model (XGBoost)
 
-print("Train the Model")
+print(f"----------------------------- Train Model -----------------------------------")
 
 regression_model_sklearn = xgb.XGBRegressor(objective ='reg:squarederror', learning_rate = 0.1, max_depth = 30, n_estimators = 100)
 regression_model_sklearn.fit(X_train, y_train)
@@ -87,6 +123,8 @@ n = len(X_test)
 print(f"k={k} n={n}")
 
 # Caluculate Evaluation Metrics
+print(f"----------------------------- Calculate Metrics -----------------------------------")
+
 RMSE = float(format(np.sqrt(mean_squared_error(y_test, y_predict)),'.3f'))
 MSE = mean_squared_error(y_test, y_predict)
 MAE = mean_absolute_error(y_test, y_predict)
