@@ -7,6 +7,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, mean_squared_error, accuracy_score
+import xgboost as xgb
+
 
 #labs/001-LinearRegression
 university_admission_df = pd.read_csv("labs/006-XgBoost/data/university_admission.csv")
@@ -18,16 +20,6 @@ print(f"columns:\n {university_admission_df.columns}")
 print(f"shape:\n {university_admission_df.shape}")
 print(f"isnull().sum():\n {university_admission_df.isnull().sum()}")
 university_admission_df = university_admission_df.dropna()
-
-
-X = university_admission_df.drop("Chance_of_Admission", axis = 1)
-y = university_admission_df["Chance_of_Admission"]
-
-print(f"X: {X.shape} \n{X}")
-print(f"y: {y.shape} \n{y}")
-
-X = np.array(X).astype('float32')
-y = np.array(y).astype('float32')
 
 # Explore Data
 
@@ -44,6 +36,23 @@ for i in university_admission_df.columns:
   sns.scatterplot(x = i, y = 'Chance_of_Admission', hue = "University_Rating", hue_norm = (1,5), data = university_admission_df)
   plt.show()
 
+# Create the Training and Test Data
+
+X = university_admission_df.drop("Chance_of_Admission", axis = 1)
+y = university_admission_df["Chance_of_Admission"]
+
+print(f"X: {X.shape} \n{X}")
+print(f"y: {y.shape} \n{y}")
+
+X = np.array(X).astype('float32')
+y = np.array(y).astype('float32')
+
+# reshaping the array from (1000,) to (1000, 1)
+y = y.reshape(-1,1)
+
+print(f"X: {X.shape} \n{X}")
+print(f"y: {y.shape} \n{y}")
+
 
 # Split the Dataset with 20% as test data
 
@@ -59,14 +68,14 @@ print(f"y_train.shape: {y_train.shape} y_test.shape: {y_test.shape}")
 
 print("Train the Model")
 
-regression_model_sklearn = LinearRegression(fit_intercept=True) #fit_intercept enable y intercept
+regression_model_sklearn = xgb.XGBRegressor(objective ='reg:squarederror', learning_rate = 0.1, max_depth = 30, n_estimators = 100)
 regression_model_sklearn.fit(X_train, y_train)
 
 regression_model_sklearn_accuracy = regression_model_sklearn.score(X_test, y_test)
 print(f"regression_model_sklearn_accuracy={regression_model_sklearn_accuracy}")
 
-print(f"coefficients=\n{regression_model_sklearn.coef_}")
-print(f"intercept={regression_model_sklearn.intercept_}")
+#print(f"coefficients=\n{regression_model_sklearn.coef_}")
+#print(f"intercept={regression_model_sklearn.intercept_}")
 
 
 # Predict
