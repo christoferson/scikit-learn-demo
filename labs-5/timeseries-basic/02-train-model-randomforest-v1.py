@@ -12,6 +12,13 @@ import seaborn as sns
 from datetime import datetime, timedelta
 from sklearn.model_selection import RandomizedSearchCV
 from scipy.stats import randint
+import logging
+
+# At the beginning of your script
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 class SalesForecaster:
     def __init__(self):
@@ -60,41 +67,53 @@ class SalesForecaster:
 
     def forecast(self, df, days_to_forecast=30):
         """Forecast sales for the next specified number of days"""
-        last_date = df['date'].max()
-        future_dates = [last_date + timedelta(days=x) for x in range(1, days_to_forecast+1)]
+        try:
+            if self.model is None:
+                raise ValueError("Model has not been trained yet")
 
-        future_df = pd.DataFrame({'date': future_dates})
-        future_df['store_id'] = df['store_id'].iloc[-1]
-        future_df['product_id'] = df['product_id'].iloc[-1]
-        future_df['price'] = df['price'].iloc[-1]  # Assuming price stays constant
+            last_date = df['date'].max()
+            future_dates = [last_date + timedelta(days=x) for x in range(1, days_to_forecast+1)]
 
-        # Create features for future dates
-        future_df = self.create_features(future_df, is_training=False)
+            future_df = pd.DataFrame({'date': future_dates})
+            future_df['store_id'] = df['store_id'].iloc[-1]
+            future_df['product_id'] = df['product_id'].iloc[-1]
+            future_df['price'] = df['price'].iloc[-1]
 
-        # Add lag and rolling mean columns with NaN values
-        for lag in [1, 7, 14, 30]:
-            future_df[f'sales_lag_{lag}'] = np.nan
-        for window in [7, 14, 30]:
-            future_df[f'sales_rolling_mean_{window}'] = np.nan
+            future_df = self.create_features(future_df, is_training=False)
 
-        # Fill NaN values in lag features with the last known values from the training data
-        for col in future_df.columns:
-            if 'lag' in col or 'rolling_mean' in col:
-                future_df[col] = df[col].iloc[-1]
+            # Add lag and rolling mean columns
+            for lag in [1, 7, 14, 30]:
+                future_df[f'sales_lag_{lag}'] = df[f'sales_lag_{lag}'].iloc[-1]
+            for window in [7, 14, 30]:
+                future_df[f'sales_rolling_mean_{window}'] = df[f'sales_rolling_mean_{window}'].iloc[-1]
 
-        # Prepare features for prediction
-        X_future = future_df[self.feature_columns]
+            # Validate features
+            missing_features = [col for col in self.feature_columns if col not in future_df.columns]
+            if missing_features:
+                raise ValueError(f"Missing features in forecast data: {missing_features}")
 
-        # Make predictions using self.model
-        future_sales = self.model.predict(X_future)
+            X_future = future_df[self.feature_columns]
+            future_sales = self.model.predict(X_future)
+            future_df['predicted_sales'] = future_sales
 
-        # Add predictions to the future dataframe
-        future_df['predicted_sales'] = future_sales
+            return future_df
 
-        return future_df
+        except Exception as e:
+            print(f"Error during forecasting: {str(e)}")
+            return None
 
     def prepare_features(self, df):
         """Prepare final feature set and handle missing values"""
+        # Validate input data
+        if df.empty:
+            raise ValueError("Input DataFrame is empty")
+
+        # Check for required columns
+        required_columns = ['date', 'store_id', 'product_id', 'price', 'sales']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+
         # List of features to use in the model
         feature_cols = [
             'store_id', 'product_id', 'price',
@@ -114,7 +133,12 @@ class SalesForecaster:
         y = df['sales'].copy()
 
         # Handle missing values
-        X = X.bfill()  # Changed from fillna(method='bfill')
+        X = X.bfill().ffill()  # Use both backward and forward fill
+
+        # Check for remaining missing values
+        if X.isnull().any().any():
+            print("Warning: Some missing values could not be filled")
+            X = X.fillna(0)  # Fill remaining NaN with 0
 
         return X, y
 
@@ -165,30 +189,49 @@ class SalesForecaster:
         return self.model
 
     def tune_hyperparameters(self, X, y):
-        # Define the parameter grid
+        # Update the parameter distribution
         param_dist = {
             'n_estimators': randint(100, 500),
             'max_depth': randint(5, 30),
             'min_samples_split': randint(2, 11),
             'min_samples_leaf': randint(1, 11),
-            'max_features': ['auto', 'sqrt', 'log2']
+            'max_features': ['sqrt', 'log2', None]  # Remove 'auto'
         }
 
         # Create a base model
         rf = RandomForestRegressor(random_state=42)
 
-        # Instantiate the random search model
-        random_search = RandomizedSearchCV(estimator=rf, param_distributions=param_dist, 
-                                           n_iter=100, cv=5, random_state=42, n_jobs=-1,
-                                           scoring='neg_mean_absolute_error')
+        # Add error handling
+        try:
+            random_search = RandomizedSearchCV(
+                estimator=rf, 
+                param_distributions=param_dist,
+                n_iter=100, 
+                cv=5, 
+                random_state=42, 
+                n_jobs=-1,
+                scoring='neg_mean_absolute_error',
+                error_score='raise'  # This will help identify specific issues
+            )
 
-        # Fit the random search model
-        random_search.fit(X, y)
+            random_search.fit(X, y)
 
-        print("Best parameters found: ", random_search.best_params_)
-        print("Best MAE found: ", -random_search.best_score_)
+            print("Best parameters found: ", random_search.best_params_)
+            print("Best MAE found: ", -random_search.best_score_)
 
-        return random_search.best_estimator_
+            return random_search.best_estimator_
+
+        except Exception as e:
+            print(f"Error during hyperparameter tuning: {str(e)}")
+            # Return a default model if tuning fails
+            return RandomForestRegressor(
+                n_estimators=200,
+                max_depth=20,
+                min_samples_split=5,
+                min_samples_leaf=2,
+                max_features='sqrt',
+                random_state=42
+            )
 
     def plot_forecast(self, df, future_df):
         """Plot historical sales and forecasted sales"""
@@ -250,54 +293,63 @@ class SalesForecaster:
 
 
 def main():
-    # Initialize the forecaster
-    forecaster = SalesForecaster()
 
-    # Load and prepare data
-    print("Loading data...")
-    df = forecaster.load_data()
+    try:
+            
+        logging.info("Starting sales forecasting process")
 
-    print("Creating features...")
-    df = forecaster.create_features(df, is_training=True)
+        # Initialize the forecaster
+        forecaster = SalesForecaster()
 
-    print("Preparing features...")
-    X, y = forecaster.prepare_features(df)
+        # Load and prepare data
+        print("Loading data...")
+        df = forecaster.load_data()
 
-    print("Dataset shape:", X.shape)
-    print("\nFeatures created:", X.columns.tolist())
+        print("Creating features...")
+        df = forecaster.create_features(df, is_training=True)
 
-    print("\nPerforming cross-validation...")
-    mae_scores, rmse_scores, r2_scores = forecaster.cross_validate(X, y, n_splits=5)
+        print("Preparing features...")
+        X, y = forecaster.prepare_features(df)
 
-    print("\nTuning hyperparameters...")
-    best_model = forecaster.tune_hyperparameters(X, y)
+        print("Dataset shape:", X.shape)
+        print("\nFeatures created:", X.columns.tolist())
 
-    print("\nTraining final model with best hyperparameters...")
-    forecaster.model = best_model  # Set the best model as the forecaster's model
-    forecaster.model.fit(X, y)  # Train the best model on all data
+        print("\nPerforming cross-validation...")
+        mae_scores, rmse_scores, r2_scores = forecaster.cross_validate(X, y, n_splits=5)
 
-    # Evaluate the final model
-    y_pred = forecaster.model.predict(X)
-    mae = mean_absolute_error(y, y_pred)
-    rmse = np.sqrt(mean_squared_error(y, y_pred))
-    r2 = r2_score(y, y_pred)
+        print("\nTuning hyperparameters...")
+        best_model = forecaster.tune_hyperparameters(X, y)
 
-    print("Final Model Performance:")
-    print(f"MAE: {mae:.2f}")
-    print(f"RMSE: {rmse:.2f}")
-    print(f"R2 Score: {r2:.2f}")
+        print("\nTraining final model with best hyperparameters...")
+        forecaster.model = best_model  # Set the best model as the forecaster's model
+        forecaster.model.fit(X, y)  # Train the best model on all data
 
-    print("\nGenerating forecast...")
-    future_df = forecaster.forecast(df, days_to_forecast=30)
+        # Evaluate the final model
+        y_pred = forecaster.model.predict(X)
+        mae = mean_absolute_error(y, y_pred)
+        rmse = np.sqrt(mean_squared_error(y, y_pred))
+        r2 = r2_score(y, y_pred)
 
-    print("\nPlotting forecast...")
-    forecaster.plot_forecast(df, future_df)
+        print("Final Model Performance:")
+        print(f"MAE: {mae:.2f}")
+        print(f"RMSE: {rmse:.2f}")
+        print(f"R2 Score: {r2:.2f}")
 
-    print("\nForecast for the next 30 days:")
-    print(future_df[['date', 'predicted_sales']])
+        print("\nGenerating forecast...")
+        future_df = forecaster.forecast(df, days_to_forecast=30)
 
-    # Print feature importance
-    forecaster.print_feature_importance(forecaster.model, X)
+        print("\nPlotting forecast...")
+        forecaster.plot_forecast(df, future_df)
 
+        print("\nForecast for the next 30 days:")
+        print(future_df[['date', 'predicted_sales']])
+
+        # Print feature importance
+        forecaster.print_feature_importance(forecaster.model, X)
+
+    except Exception as e:
+            logging.error(f"Error in main execution: {str(e)}")
+            raise
+    
 if __name__ == "__main__":
     main()
