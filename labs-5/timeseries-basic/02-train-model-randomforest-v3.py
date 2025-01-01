@@ -153,52 +153,74 @@ class SalesForecaster:
         return mae, rmse, r2
     
     def create_features(self, df, is_training=True):
+        """Create time series features."""
         df = df.copy()
 
-        # Existing features
-        df['year'] = df['date'].dt.year
-        df['month'] = df['date'].dt.month
-        df['day_of_week'] = df['date'].dt.dayofweek
-        df['day_of_month'] = df['date'].dt.day
-        df['week_of_year'] = df['date'].dt.isocalendar().week
-        df['is_weekend'] = df['day_of_week'].isin([5, 6]).astype(int)
-        df['is_month_start'] = df['date'].dt.is_month_start.astype(int)
-        df['is_month_end'] = df['date'].dt.is_month_end.astype(int)
+        # Ensure date is datetime
+        df['date'] = pd.to_datetime(df['date'])
 
-        # New features
-        df['quarter'] = df['date'].dt.quarter
-        df['is_quarter_start'] = df['date'].dt.is_quarter_start.astype(int)
-        df['is_quarter_end'] = df['date'].dt.is_quarter_end.astype(int)
-        df['days_in_month'] = df['date'].dt.days_in_month
-        df['sine_day_of_year'] = np.sin(2 * np.pi * df['date'].dt.dayofyear / 365.25)
-        df['cosine_day_of_year'] = np.cos(2 * np.pi * df['date'].dt.dayofyear / 365.25)
+        # Basic time features - using astype(np.int32) for integer features
+        df['year'] = df['date'].dt.year.astype(np.int32)
+        df['month'] = df['date'].dt.month.astype(np.int32)
+        df['day_of_week'] = df['date'].dt.dayofweek.astype(np.int32)
+        df['day_of_month'] = df['date'].dt.day.astype(np.int32)
+        df['week_of_year'] = df['date'].dt.isocalendar().week.astype(np.int32)
+        df['is_weekend'] = df['day_of_week'].isin([5, 6]).astype(np.int32)
+        df['is_month_start'] = df['date'].dt.is_month_start.astype(np.int32)
+        df['is_month_end'] = df['date'].dt.is_month_end.astype(np.int32)
+
+        # Quarter features
+        df['quarter'] = df['date'].dt.quarter.astype(np.int32)
+        df['is_quarter_start'] = df['date'].dt.is_quarter_start.astype(np.int32)
+        df['is_quarter_end'] = df['date'].dt.is_quarter_end.astype(np.int32)
+        df['days_in_month'] = df['date'].dt.days_in_month.astype(np.int32)
+
+        # Cyclical features - using float32 for continuous values
+        df['sine_day_of_year'] = np.sin(2 * np.pi * df['date'].dt.dayofyear / 365.25).astype(np.float32)
+        df['cosine_day_of_year'] = np.cos(2 * np.pi * df['date'].dt.dayofyear / 365.25).astype(np.float32)
 
         if is_training:
-            # Existing lag features
+            # Lag features
             for lag in [1, 7, 14, 30]:
-                df[f'sales_lag_{lag}'] = df.groupby(['store_id', 'product_id'])['sales'].shift(lag)
+                df[f'sales_lag_{lag}'] = df.groupby(['store_id', 'product_id'])['sales'].shift(lag).astype(np.float32)
 
-            # Existing rolling mean features
-            for window in [7, 14, 30]:
-                df[f'sales_rolling_mean_{window}'] = df.groupby(['store_id', 'product_id'])['sales']\
+            # Rolling mean features
+            for window in [7, 14, 30, 60, 90]:
+                df[f'sales_rolling_mean_{window}'] = (
+                    df.groupby(['store_id', 'product_id'])['sales']
                     .transform(lambda x: x.rolling(window=window, min_periods=1).mean())
+                    .astype(np.float32)
+                )
 
-            # New features
-            # 60-day and 90-day rolling means
-            for window in [60, 90]:
-                df[f'sales_rolling_mean_{window}'] = df.groupby(['store_id', 'product_id'])['sales']\
-                    .transform(lambda x: x.rolling(window=window, min_periods=1).mean())
+            # Year-over-year features
+            df['sales_lag_365'] = (
+                df.groupby(['store_id', 'product_id'])['sales']
+                .shift(365)
+                .astype(np.float32)
+            )
 
-            # Year-over-year lag
-            df['sales_lag_365'] = df.groupby(['store_id', 'product_id'])['sales'].shift(365)
-
-            # Rolling mean of the past year
-            df['sales_rolling_mean_365'] = df.groupby(['store_id', 'product_id'])['sales']\
+            df['sales_rolling_mean_365'] = (
+                df.groupby(['store_id', 'product_id'])['sales']
                 .transform(lambda x: x.rolling(window=365, min_periods=1).mean())
+                .astype(np.float32)
+            )
 
-            # Percentage change from previous day, week, and year
+            # Percentage change features
             for lag in [1, 7, 365]:
-                df[f'sales_pct_change_{lag}'] = df.groupby(['store_id', 'product_id'])['sales'].pct_change(periods=lag)
+                pct_change = (
+                    df.groupby(['store_id', 'product_id'])['sales']
+                    .pct_change(periods=lag)
+                    .replace([np.inf, -np.inf], np.nan)
+                    .astype(np.float32)
+                )
+                df[f'sales_pct_change_{lag}'] = pct_change
+
+        # Ensure store_id and product_id are integers
+        df['store_id'] = df['store_id'].astype(np.int32)
+        df['product_id'] = df['product_id'].astype(np.int32)
+
+        # Ensure price is float
+        df['price'] = df['price'].astype(np.float32)
 
         return df
 
@@ -262,10 +284,20 @@ class SalesForecaster:
 
         # Prepare X and y
         X = df[feature_cols].copy()
-        y = df['sales'].copy()
+        y = df['sales'].astype(np.float32)
 
         # Handle missing values
-        X = X.fillna(method='bfill')
+        X = X.ffill().bfill()
+
+        # Ensure all numeric columns have the correct dtype
+        for col in X.columns:
+            if col in ['store_id', 'product_id', 'year', 'month', 'day_of_week', 
+                    'day_of_month', 'week_of_year', 'is_weekend', 'is_month_start', 
+                    'is_month_end', 'quarter', 'is_quarter_start', 'is_quarter_end', 
+                    'days_in_month']:
+                X[col] = X[col].astype(np.int32)
+            else:
+                X[col] = X[col].astype(np.float32)
 
         return X, y
 
