@@ -14,27 +14,136 @@ from sklearn.model_selection import RandomizedSearchCV
 from scipy.stats import randint
 
 class SalesForecaster:
-    def __init__(self):
+    def __init__(self, tune_hyperparameters_enabled=True):
         self.scaler = StandardScaler()
         self.model = None
         self.feature_columns = None
+        self.tune_hyperparameters_enabled = tune_hyperparameters_enabled
 
+    def get_default_model_params(self):
+        """Return default model parameters"""
+        return {
+            'n_estimators': 100,
+            'max_depth': 20,
+            'min_samples_split': 2,
+            'min_samples_leaf': 1,
+            'max_features': 'sqrt',
+            'random_state': 42
+        }
+    
     def load_data(self):
-        """Load and prepare the dataset"""
-        # Get the path to the data file
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        data_path = os.path.join(current_dir, 'data', 'product_sales.csv')
+        """Load and validate the dataset"""
+        try:
+            # Get the path to the data file
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            data_path = os.path.join(current_dir, 'data', 'product_sales.csv')
 
-        # Load the data
-        df = pd.read_csv(data_path)
-        df['date'] = pd.to_datetime(df['date'])
-        return df
+            if not os.path.exists(data_path):
+                raise FileNotFoundError(f"Data file not found at {data_path}")
+
+            # Load the data
+            df = pd.read_csv(data_path)
+
+            # Convert date column to datetime before validation
+            df['date'] = pd.to_datetime(df['date'])
+
+            # Validate the data
+            self.validate_data(df)
+
+            return df
+
+        except Exception as e:
+            print(f"Error loading data: {str(e)}")
+            raise
+
+    def validate_data(self, df: pd.DataFrame) -> bool:
+        """
+        Validate the input data for required columns and data quality.
+
+        Args:
+            df (pd.DataFrame): Input DataFrame to validate
+
+        Returns:
+            bool: True if validation passes
+
+        Raises:
+            ValueError: If validation fails
+        """
+        try:
+            # Check if DataFrame is empty
+            if df.empty:
+                raise ValueError("The input DataFrame is empty")
+
+            # Check for required columns
+            required_columns = ['date', 'store_id', 'product_id', 'sales', 'price']
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            if missing_columns:
+                raise ValueError(f"Missing required columns: {missing_columns}")
+
+            # Ensure date column is datetime
+            if not pd.api.types.is_datetime64_any_dtype(df['date']):
+                raise ValueError("Date column must be datetime type")
+
+            # Check for null values in critical columns
+            null_counts = df[required_columns].isnull().sum()
+            if null_counts.any():
+                print("Warning: Dataset contains missing values:")
+                print(null_counts[null_counts > 0])
+
+            # Validate data types
+            expected_types = {
+                'store_id': ['int64', 'int32'],
+                'product_id': ['int64', 'int32'],
+                'sales': ['float64', 'int64', 'int32'],
+                'price': ['float64', 'int64', 'int32']
+            }
+
+            for column, expected_type in expected_types.items():
+                if df[column].dtype.name not in expected_type:
+                    print(f"Warning: Column {column} has type {df[column].dtype.name}, "
+                        f"expected one of {expected_type}")
+
+            # Check for negative values in sales and price
+            if (df['sales'] < 0).any():
+                raise ValueError("Dataset contains negative sales values")
+            if (df['price'] < 0).any():
+                raise ValueError("Dataset contains negative price values")
+
+            # Check date range
+            date_range = df['date'].max() - df['date'].min()
+            if date_range.days < 365:
+                print("Warning: Dataset spans less than a year, which might affect "
+                    "seasonal feature generation")
+
+            # Check for duplicate records
+            duplicates = df.duplicated(subset=['date', 'store_id', 'product_id'])
+            if duplicates.any():
+                print(f"Warning: Found {duplicates.sum()} duplicate records")
+
+            return True
+
+        except Exception as e:
+            print(f"Data validation error: {str(e)}")
+            raise
 
     def split_data(self, X, y, test_size=0.2):
             """Split the data into training and test sets"""
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, shuffle=False)
             return X_train, X_test, y_train, y_test
 
+    def construct_model(self, X_train, y_train):
+        """
+        Construct the best model based on hyperparameter tuning flag
+        """
+        if self.tune_hyperparameters_enabled:  # Updated flag name
+            print("\nTuning hyperparameters...")
+            best_model = self.tune_hyperparameters(X_train, y_train)
+            print("\nConstructing model with best hyperparameters...")
+            return best_model
+        else:
+            print("\nConstructing model with default parameters...")
+            return RandomForestRegressor(**self.get_default_model_params())
+        
     def evaluate_model(self, X, y):
         """Evaluate the model on given data"""
         y_pred = self.model.predict(X)
@@ -183,9 +292,14 @@ class SalesForecaster:
         # Split the data into training and testing sets
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        # Initialize and train the model
-        self.model = RandomForestRegressor(n_estimators=100, random_state=42)
-        self.model.fit(X_train, y_train)
+        if self.tune_hyperparameters:
+            # Initialize and train the model with hyperparameter tuning
+            self.model = RandomForestRegressor(n_estimators=100, random_state=42)
+            self.model.fit(X_train, y_train)
+        else:
+            # Use default parameters
+            self.model = RandomForestRegressor(**self.get_default_model_params())
+            self.model.fit(X_train, y_train)
 
         # Make predictions on the test set
         y_pred = self.model.predict(X_test)
@@ -213,7 +327,7 @@ class SalesForecaster:
             'max_depth': randint(5, 30),
             'min_samples_split': randint(2, 11),
             'min_samples_leaf': randint(1, 11),
-            'max_features': ['sqrt', 'log2', None]  # Removed 'auto'
+            'max_features': ['sqrt', 'log2', None],
         }
 
         # Create a base model
@@ -271,9 +385,12 @@ class SalesForecaster:
             X_train, X_test = X.iloc[train_index], X.iloc[test_index]
             y_train, y_test = y.iloc[train_index], y.iloc[test_index]
 
-            model = RandomForestRegressor(n_estimators=100, random_state=42)
-            model.fit(X_train, y_train)
+            if self.tune_hyperparameters_enabled:  # Updated flag name
+                model = RandomForestRegressor(n_estimators=100, random_state=42)
+            else:
+                model = RandomForestRegressor(**self.get_default_model_params())
 
+            model.fit(X_train, y_train)
             y_pred = model.predict(X_test)
 
             mae = mean_absolute_error(y_test, y_pred)
@@ -294,7 +411,7 @@ class SalesForecaster:
 
 def main():
     # Initialize the forecaster
-    forecaster = SalesForecaster()
+    forecaster = SalesForecaster(tune_hyperparameters_enabled=False)
 
     # Load and prepare data
     print("Loading data...")
@@ -317,12 +434,9 @@ def main():
     print("\nPerforming cross-validation on training set...")
     mae_scores, rmse_scores, r2_scores = forecaster.cross_validate(X_train, y_train, n_splits=5)
 
-    print("\nTuning hyperparameters...")
-    best_model = forecaster.tune_hyperparameters(X_train, y_train)
-
-    print("\nTraining final model with best hyperparameters...")
-    forecaster.model = best_model  # Set the best model as the forecaster's model
-    forecaster.model.fit(X_train, y_train)  # Train the best model on training data
+    # Construct and train the model
+    forecaster.model = forecaster.construct_model(X_train, y_train)
+    forecaster.model.fit(X_train, y_train)
 
     # Evaluate on training set
     print("\nEvaluating model on training set:")
