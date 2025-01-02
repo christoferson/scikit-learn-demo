@@ -312,3 +312,112 @@ Feature Importance:
 3                    year    0.001384
 9          is_month_start    0.000796
 10           is_month_end    0.000503
+
+
+RandomForest (V3)
+--------------------------------------------------------------------------------
+
+Loading data...
+Creating features...
+Preparing features...
+Dataset shape: (6570, 31)
+
+Features created: ['store_id', 'product_id', 'price', 'year', 'month', 'day_of_week', 'day_of_month', 'week_of_year', 'is_weekend', 'is_month_start', 'is_month_end', 'quarter', 'is_quarter_start', 'is_quarter_end', 'days_in_month', 'sine_day_of_year', 'cosine_day_of_year', 'sales_lag_1', 'sales_lag_7', 'sales_lag_14', 'sales_lag_30', 'sales_rolling_mean_7', 'sales_rolling_mean_14', 'sales_rolling_mean_30', 'sales_rolling_mean_60', 'sales_rolling_mean_90', 'sales_lag_365', 'sales_rolling_mean_365', 'sales_pct_change_1', 'sales_pct_change_7', 'sales_pct_change_365']
+
+Splitting data into train and test sets...
+Training set shape: (5256, 31), Test set shape: (1314, 31)
+
+Performing cross-validation on training set...
+
+Cross-validation results:
+MAE: 1.16 (+/- 0.81)
+RMSE: 2.26 (+/- 0.79)
+R2: 0.97 (+/- 0.02)
+
+Tuning hyperparameters...
+Best parameters found:  {'max_depth': 29, 'max_features': None, 'min_samples_leaf': 1, 'min_samples_split': 
+2, 'n_estimators': 476}
+Best MAE found:  0.724317705523889
+
+Training final model with best hyperparameters...
+
+Evaluating model on training set:
+Training MAE: 0.21
+Training RMSE: 0.52
+Training R2 Score: 1.00
+
+Evaluating model on test set:
+Test MAE: 0.83
+Test RMSE: 1.66
+Test R2 Score: 0.99
+
+Generating forecast...
+
+Plotting forecast...
+
+Forecast for the next 30 days:
+         date  predicted_sales
+0  2023-01-01       165.754202
+1  2023-01-02       170.773109
+2  2023-01-03       170.745798
+3  2023-01-04       170.743697
+4  2023-01-05       170.760504
+5  2023-01-06       170.792017
+6  2023-01-07       165.659664
+7  2023-01-08       165.649160
+8  2023-01-09       170.794118
+9  2023-01-10       170.789916
+10 2023-01-11       170.836134
+11 2023-01-12       170.859244
+12 2023-01-13       170.810924
+13 2023-01-14       165.500000
+14 2023-01-15       165.497899
+15 2023-01-16       170.867647
+16 2023-01-17       170.771008
+17 2023-01-18       170.764706
+18 2023-01-19       170.785714
+19 2023-01-20       170.777311
+20 2023-01-21       165.489496
+21 2023-01-22       165.487395
+22 2023-01-23       170.762605
+23 2023-01-24       170.756303
+24 2023-01-25       170.750000
+25 2023-01-26       170.777311
+26 2023-01-27       170.768908
+27 2023-01-28       165.575630
+28 2023-01-29       165.579832
+29 2023-01-30       170.758403
+
+Feature Importance:
+                   feature  importance
+18             sales_lag_7    0.703348
+29      sales_pct_change_7    0.168863
+21    sales_rolling_mean_7    0.082289
+8               is_weekend    0.013231
+5              day_of_week    0.012128
+28      sales_pct_change_1    0.004582
+22   sales_rolling_mean_14    0.002584
+7             week_of_year    0.002178
+16      cosine_day_of_year    0.002175
+19            sales_lag_14    0.001628
+17             sales_lag_1    0.001114
+27  sales_rolling_mean_365    0.000914
+25   sales_rolling_mean_90    0.000768
+23   sales_rolling_mean_30    0.000757
+24   sales_rolling_mean_60    0.000656
+2                    price    0.000438
+6             day_of_month    0.000437
+15        sine_day_of_year    0.000325
+30    sales_pct_change_365    0.000325
+26           sales_lag_365    0.000308
+20            sales_lag_30    0.000291
+4                    month    0.000278
+0                 store_id    0.000085
+12        is_quarter_start    0.000059
+14           days_in_month    0.000051
+11                 quarter    0.000051
+1               product_id    0.000044
+9           is_month_start    0.000043
+3                     year    0.000034
+10            is_month_end    0.000009
+13          is_quarter_end    0.000005
